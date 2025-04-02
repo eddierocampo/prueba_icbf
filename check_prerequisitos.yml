@@ -1,0 +1,99 @@
+---
+- name: Validación de pre-requisitos AAP
+  hosts: all
+
+  tasks:
+    - name: Validación de distribución de File System
+      ansible.builtin.command: df -hT
+      changed_when: file_system.rc != 0
+      register: file_system
+
+    - name: Estado del SELinux
+      ansible.builtin.command: sestatus
+      changed_when: selinux.rc != 0
+      register: selinux
+
+    - name: Validar estado servicio Firewalld
+      ansible.builtin.shell: |
+        systemctl status firewalld
+        firewall-cmd --list-services
+      changed_when: firewall.rc != 0
+      register: firewall
+
+    - name: Validación reglas Firewall
+      ansible.builtin.shell: |
+        firewall-cmd --list-services
+        firewall-cmd --list-all --permanent
+      changed_when: reglas_fw.rc != 0
+      register: reglas_fw
+
+    - name: Validar estado de suscripción
+      become: true
+      ansible.builtin.command: subscription-manager list
+      changed_when: subscription.rc != 0
+      register: subscription
+
+    - name: Validar estado servicio chronyd
+      ansible.builtin.shell: |
+        systemctl status chronyd
+        chronyc tracking
+        chronyc sources
+        date
+      changed_when: chronyd.rc != 0
+      register: chronyd
+
+    - name: Validar fecha, hora y zona horaria
+      ansible.builtin.command: timedatectl
+      changed_when: timedate.rc != 0
+      register: timedate
+
+    - name: Validar estado de sudo usuario ansibleadmin
+      become: true
+      ansible.builtin.shell: cat /etc/sudoers |grep ansibleadmin
+      changed_when: sudouser.rc != 0
+      register: sudouser
+
+    - name: Debug OS
+      ansible.builtin.debug:
+        msg:
+          - El servidor tiene
+          - OS {{ ansible_facts['distribution'] }} en la versión {{ ansible_facts['distribution_version'] }}
+          - SELinux mode {{ ansible_facts['selinux']['mode'] }} y status {{ ansible_facts['selinux']['status'] }} y type {{ ansible_facts['selinux']['type'] }}
+          - Tiene {{ ansible_facts['processor_nproc'] }} procesadores, cuenta con {{ ansible_facts['memtotal_mb'] }}Mb de memoria RAM
+          - La arquitectura de la máquina es {{ ansible_facts['machine'] }}
+          - Con un fqdn {{ ansible_facts['fqdn'] }} con la IP  {{ ansible_facts['default_ipv4']['address'] }}
+          - Sobre la infraetructura {{ ansible_facts['system_vendor'] }}
+
+    - name: Debug FileSystem
+      ansible.builtin.debug:
+        var: file_system.stdout_lines
+
+    - name: Debug Selinux
+      ansible.builtin.debug:
+        var: selinux.stdout_lines
+
+    - name: Debug Firewalld
+      ansible.builtin.debug:
+        var: firewall.stdout_lines
+
+    - name: Debug reglas de Firewall
+      ansible.builtin.debug:
+        var: reglas_fw.stdout_lines
+
+    - name: Debug suscripcion
+      ansible.builtin.debug:
+        var: subscription.stdout_lines
+
+    - name: Debug chronyd
+      ansible.builtin.debug:
+        var: chronyd.stdout_lines
+
+    - name: Debug timedatectl
+      ansible.builtin.debug:
+        var: timedate.stdout_lines
+
+    - name: Debug sudo
+      ansible.builtin.debug:
+        var: sudouser.stdout_lines
+
+...
